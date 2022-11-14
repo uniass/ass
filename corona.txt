@@ -1,0 +1,476 @@
+----- ASS 2 ------------------------------------------------------
+
+import tensorflow as tf
+from tensorflow import keras
+import pandas as pd 
+import numpy as np
+import matplotlib.pyplot as plt
+import random 
+get_ipython().run_line_magic("matplotlib","inline")
+
+mnist = tf.keras.datasets.mnist
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+
+len(x_train)
+len(x_test)
+x_train.shape
+x_test.shape
+x_train[0]
+
+plt.matshow(x_train[11])
+
+x_train = x_train/255
+x_test = x_test/255
+
+x_train[11]
+
+model = keras.Sequential([
+    keras.layers.Flatten(input_shape=(28, 28)),
+    keras.layers.Dense(128, activation='relu'),
+    keras.layers.Dense(10, activation='softmax')
+])
+
+model.summary()
+
+model.compile(optimizer='sgd',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+history=model.fit(x_train, y_train,validation_data=(x_test,y_test),epochs=10)
+
+test_loss, test_acc=model.evaluate(x_test,y_test)
+print("Loss=%.3f" %test_loss)
+print("Accuracy=%.3f" %test_acc)
+
+n=random.randint(0,9999)
+plt.imshow(x_test[n])
+plt.show()
+
+predicted_value=model.predict(x_test)
+print("Handwritten number in the image is= %d" %np.argmax(predicted_value))
+
+get_ipython().run_line_magic('pinfo2','history.history')
+history.history.keys()
+
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['Train', 'Validation'], loc='upper left')
+plt.show()
+
+----- ASS 3 -----------------------------------------------------------
+
+import numpy as np
+import pandas as pd
+import os 
+import random 
+
+import  matplotlib.image as mping
+import matplotlib.pyplot as plt
+import seaborn as sns
+import cv2
+
+
+import tensorflow
+
+from keras.preprocessing.image import ImageDataGenerator
+
+%matplotlib inline
+
+TrainingImagePath="/content/drive/MyDrive/Image/train"
+TestImagePath="/content/drive/MyDrive/Image/test"
+ValidationImagePath="/content/drive/MyDrive/Image/valid"
+
+train_datagen = ImageDataGenerator(
+    rescale = 1./255,
+    shear_range=0.1,
+    zoom_range=0.1,
+    horizontal_flip=True
+)
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+training_set = train_datagen.flow_from_directory(
+    TrainingImagePath,
+    target_size=(128,128),
+    batch_size=32,
+    class_mode="categorical"
+)
+
+test_set = test_datagen.flow_from_directory(
+    TestImagePath,
+    target_size = (128,128),
+    batch_size=32,
+    class_mode="categorical"
+)
+
+valid_set = test_datagen.flow_from_directory(
+    ValidationImagePath,
+    target_size=(128,128),
+    batch_size=32,
+    class_mode="categorical"
+)
+
+def showImages(class_name):
+  random_index = random.choice(list(range(1,49)))
+  folder_path = os.path.join(TrainingImagePath, class_name)
+  try:
+    image_path = os.path.join(folder_path,str(random_index).zfill(3)+".jpg")
+    plt.imshow(mping.imread(image_path))
+  except:
+    image_path = os.path.join(folder_path,str(random_index).zfill(2)+".jpg")
+    plt.imshow(mping.imread(image_path))
+  plt.title(class_name)
+  plt.axis(False)
+
+plt.figure(figsize = (20,20))
+for labels,number in training_set.class_indices.items():
+  plt.subplot(6,6,number+1)
+  showImages(labels)
+
+test_set.class_indices
+
+'''#################### Creating lookup table for all balls ##############################'''
+# class_indices have the numeric tag for each balls
+TrainClasses=training_set.class_indices
+
+# Storing the face and the numeric tag for future reference
+ResultMap={}
+for ballValue,ballName in zip(TrainClasses.values(),TrainClasses.keys()):
+    ResultMap[ballValue]=ballName
+
+# Saving the face map for future reference
+import pickle
+with open(R"E:\Data Sets\Balls Classification\ResultsMap.pkl", 'wb') as f:
+    pickle.dump(ResultMap, f, pickle.HIGHEST_PROTOCOL)
+
+print("Mapping of Face and its ID",ResultMap)
+
+# The number of neurons for the output layer is equal to the number of faces
+OutputNeurons=len(ResultMap)
+print('\n The Number of output neurons: ', OutputNeurons)
+
+from keras.models import Sequential
+from keras.layers import Convolution2D
+from keras.layers import MaxPool2D
+from keras.layers import Flatten
+from keras.layers import Dense
+
+classifier= Sequential()
+
+
+classifier.add(Convolution2D(32, kernel_size=(3, 3), strides=(1, 1), input_shape=(128,128,3), activation='relu'))
+
+classifier.add(MaxPool2D(pool_size=(2,2)))
+
+''
+classifier.add(Convolution2D(64, kernel_size=(3, 3), strides=(1, 1), activation='relu'))
+
+classifier.add(MaxPool2D(pool_size=(2,2)))
+
+
+classifier.add(Flatten())
+
+classifier.add(Dense(256, activation='relu'))
+
+classifier.add(Dense(OutputNeurons, activation='softmax'))
+
+classifier.compile(loss='categorical_crossentropy', optimizer = 'rmsprop', metrics=["accuracy"])
+
+classifier.summary()
+
+import time
+# Measuring the time taken by the model to train
+StartTime=time.time()
+
+# Starting the model training
+model_history=classifier.fit_generator(
+                                        training_set,
+                                        steps_per_epoch=len(training_set),
+                                        epochs=20,
+                                        validation_data=valid_set,
+                                        validation_steps=len(valid_set),
+                                        verbose=1)
+
+EndTime=time.time()
+print("############### Total Time Taken: ", round((EndTime-StartTime)/60), 'Minutes #############')
+
+accuracy = model_history.history['accuracy']
+val_accuracy  = model_history.history['val_accuracy']
+
+loss = model_history.history['loss']
+val_loss = model_history.history['val_loss']
+
+plt.figure(figsize=(15,10))
+
+plt.subplot(2, 2, 1)
+plt.plot(accuracy, label = "Training accuracy")
+plt.plot(val_accuracy, label="Validation accuracy")
+plt.legend()
+plt.title("Training vs validation accuracy")
+
+plt.subplot(2,2,2)
+plt.plot(loss, label = "Training loss")
+plt.plot(val_loss, label="Validation loss")
+plt.legend()
+plt.title("Training vs validation loss")
+
+plt.show()
+
+----- ASS 4 auto -----------------------------------------------------------
+
+import matplotlib.pyplot as plt
+import numpy as np 
+import pandas as pd
+import tensorflow as tf
+
+from sklearn.metrics import accuracy_score, precision_score, recall_score
+from sklearn.model_selection import train_test_split
+from tensorflow.keras import layers, losses
+from tensorflow.keras.datasets import fashion_mnist
+from tensorflow.keras.models import Model
+
+(x_train, _), (x_test, _) = fashion_mnist.load_data()
+
+x_train = x_train/255.
+x_test = x_test/255.
+
+print(x_train.shape)
+print(x_test.shape)
+
+latent_dim = 64
+class Autoencoder(Model):
+  def __init__(self, latent_dim):
+    super(Autoencoder, self).__init__()
+    self.latent_dim = latent_dim   
+    self.encoder = tf.keras.Sequential([
+      layers.Flatten(),
+      layers.Dense(latent_dim, activation='relu')
+    ])
+    self.decoder = tf.keras.Sequential([
+      layers.Dense(784, activation='sigmoid'),
+      layers.Reshape((28, 28))
+    ])
+
+  def call(self, x):
+    encoded = self.encoder(x)
+    decoded = self.decoder(encoded)
+    return decoded
+
+autoencoder = Autoencoder(latent_dim)
+
+autoencoder.compile(optimizer='adam', loss=losses.MeanSquaredError())
+
+autoencoder.fit(x_train, x_train,
+                epochs=10,
+                shuffle=True,
+                validation_data=(x_test, x_test))
+
+encoded_imgs = autoencoder.encoder(x_test).numpy()
+decoded_imgs = autoencoder.decoder(encoded_imgs).numpy()
+
+n = 10
+plt.figure(figsize=(20, 4))
+for i in range(n):
+  # display original
+  ax = plt.subplot(2, n, i + 1)
+  plt.imshow(x_test[i])
+  plt.title("original")
+  plt.gray()
+  ax.get_xaxis().set_visible(False)
+  ax.get_yaxis().set_visible(False)
+
+  # display reconstruction
+  ax = plt.subplot(2, n, i + 1 + n)
+  plt.imshow(decoded_imgs[i])
+  plt.title("reconstructed")
+  plt.gray()
+  ax.get_xaxis().set_visible(False)
+  ax.get_yaxis().set_visible(False)
+plt.show()
+
+-----ASS 5 CBOW ----------------------------------------------------------
+
+import numpy as np
+import keras.backend as K
+from keras.models import Sequential
+from keras.layers import Dense,Embedding,Lambda
+from keras.utils import np_utils
+from keras.preprocessing import sequence 
+from keras.preprocessing.text import Tokenizer
+import gensim
+
+data = open("/content/corona.txt","r")
+covid_data= [text for text in data if text.count("")>=2]
+vectorize=Tokenizer()
+vectorize.fit_on_texts(covid_data)
+covid_data=vectorize.texts_to_sequences(covid_data)
+total_vocab=sum(len(s) for s in covid_data)
+word_count=len(vectorize.word_index)+1
+window_size=2
+
+def cbow_model(data,windows_size, total_vocab):
+  total_length=window_size*2
+  for text in data:
+    text_len=len(text)
+    for idx, word in enumerate(text):
+      context_word=[]
+      target=[]
+      begin=idx-window_size
+      end=idx+window_size+1
+      context_word.append([text[i] for i in range(begin,end) if 0<- i< text_len and i!=idx])
+      target.append(word)
+      contextual = sequence.pad_sequences(context_word, total_length=total_length)
+      final_target=np_utils.to_categorical(target, total_vocab)
+      yield(contextual, final_target)
+
+model=Sequential()
+model.add(Embedding(input_dim=total_vocab,output_dim=100,input_length=window_size*2))
+model.add(Lambda(lambda x:K.mean(x,axis=1), output_shape=(100,)))
+model.add(Dense(total_vocab, activation="softmax"))
+model.compile(loss="categorical_crossentropy", optimizer="adam")
+for i in range(10):
+  cost=0
+  for x, y in cbow_model(data,window_size, total_vocab):
+    cost+=model.train_on_batch(contextual, final_target)
+  print(i, cost)
+
+dimensions = 100
+vect_file=open("/content/vector.txt", "w")
+vect_file.write('{} {}\n'.format(total_vocab, dimensions))
+
+weight=model.get_weights()[0]
+for text, i in vectorize.word_index.items():
+  final_vec="".join(map(str, list(weight[i,:])))
+  vect_file.write('{}{}\n'.format(text, final_vec))
+vect_file.close()
+
+cbow_output=gensim.models.KeyedVectors.load_word2vec_format("/content/vector.txt", binary=False)
+cbow_output.most_similar(positive=["virus"])
+
+
+-----ASS 4 anomaly--------------------------------------------------------
+
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score
+from tensorflow.keras.optimizers import Adam
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras import Model, Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.losses import MeanSquaredLogarithmicError
+
+# Download the dataset
+PATH_TO_DATA = 'http://storage.googleapis.com/download.tensorflow.org/data/ecg.csv'
+data = pd.read_csv(PATH_TO_DATA, header=None)
+data.head()
+
+# data shape
+# (4998, 141)
+
+# last column is the target
+# 0 = anomaly, 1 = normal
+TARGET = 140
+
+features = data.drop(TARGET, axis=1)
+target = data[TARGET]
+
+x_train, x_test, y_train, y_test = train_test_split(
+    features, target, test_size=0.2, stratify=target
+)
+
+# use case is novelty detection so use only the normal data
+# for training
+train_index = y_train[y_train == 1].index
+train_data = x_train.loc[train_index]
+
+# min max scale the input data
+min_max_scaler = MinMaxScaler(feature_range=(0, 1))
+x_train_scaled = min_max_scaler.fit_transform(train_data.copy())
+x_test_scaled = min_max_scaler.transform(x_test.copy())
+
+# create a model by subclassing Model class in tensorflow
+class AutoEncoder(Model):
+  """
+  Parameters
+  ----------
+  output_units: int
+    Number of output units
+  
+  code_size: int
+    Number of units in bottle neck
+  """
+
+  def __init__(self, output_units, code_size=8):
+    super().__init__()
+    self.encoder = Sequential([
+      Dense(64, activation='relu'),
+      Dropout(0.1),
+      Dense(32, activation='relu'),
+      Dropout(0.1),
+      Dense(16, activation='relu'),
+      Dropout(0.1),
+      Dense(code_size, activation='relu')
+    ])
+    self.decoder = Sequential([
+      Dense(16, activation='relu'),
+      Dropout(0.1),
+      Dense(32, activation='relu'),
+      Dropout(0.1),
+      Dense(64, activation='relu'),
+      Dropout(0.1),
+      Dense(output_units, activation='sigmoid')
+    ])
+  
+  def call(self, inputs):
+    encoded = self.encoder(inputs)
+    decoded = self.decoder(encoded)
+    return decoded
+  
+model = AutoEncoder(output_units=x_train_scaled.shape[1])
+# configurations of model
+model.compile(loss='msle', metrics=['mse'], optimizer='adam')
+
+history = model.fit(
+    x_train_scaled,
+    x_train_scaled,
+    epochs=20,
+    batch_size=512,
+    validation_data=(x_test_scaled, x_test_scaled)
+)
+
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.xlabel('Epochs')
+plt.ylabel('MSLE Loss')
+plt.legend(['loss', 'val_loss'])
+plt.show()
+
+def find_threshold(model, x_train_scaled):
+  reconstructions = model.predict(x_train_scaled)
+  # provides losses of individual instances
+  reconstruction_errors = tf.keras.losses.msle(reconstructions, x_train_scaled)
+  # threshold for anomaly scores
+  threshold = np.mean(reconstruction_errors.numpy()) \
+      + np.std(reconstruction_errors.numpy())
+  return threshold
+
+def get_predictions(model, x_test_scaled, threshold):
+  predictions = model.predict(x_test_scaled)
+  # provides losses of individual instances
+  errors = tf.keras.losses.msle(predictions, x_test_scaled)
+  # 0 = anomaly, 1 = normal
+  anomaly_mask = pd.Series(errors) > threshold
+  preds = anomaly_mask.map(lambda x: 0.0 if x == True else 1.0)
+  return preds
+
+threshold = find_threshold(model, x_train_scaled)
+print(f"Threshold: {threshold}")
+# Threshold: 0.01001314025746261
+predictions = get_predictions(model, x_test_scaled, threshold)
+accuracy_score(predictions, y_test)
+# 0.944
